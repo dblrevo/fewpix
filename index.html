@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photographs by Oleg Boldyrev</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@200;300&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #111; --text: #eee; --accent: #e67e22; --overlay: rgba(0,0,0,0.75); }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; overflow-x: hidden; }
+        
+        /* Hamburger Menu */
+        #menu-btn { position: fixed; top: 0; left: 0; z-index: 51; padding: 18px 24px; cursor: pointer; }
+        #menu-btn span { display: block; width: 22px; height: 1px; background: #ccc; margin: 5px 0; transition: 0.3s; }
+        #menu-btn.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+        #menu-btn.open span:nth-child(2) { opacity: 0; }
+        #menu-btn.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+        #tag-menu { position: fixed; top: 55px; left: 0; z-index: 50; background: #0d0d0d; border-right: 1px solid #222; border-bottom: 1px solid #222; padding: 10px 0; min-width: 180px; display: none; }
+        #tag-menu.open { display: block; }
+        .menu-tag { display: block; padding: 9px 24px; font-family: 'Raleway', sans-serif; font-weight: 300; font-size: 0.8em; letter-spacing: 2px; text-transform: uppercase; color: #888; cursor: pointer; transition: 0.2s; }
+        .menu-tag:hover { color: #fff; background: #1a1a1a; }
+
+        /* Masthead */
+        #masthead { position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding: 18px 28px; text-align: right; background: var(--bg); border-bottom: 1px solid #222; }
+        #masthead h1 { font-family: 'Raleway', sans-serif; font-weight: 200; font-size: 0.95em; letter-spacing: 4px; text-transform: uppercase; color: #ccc; margin: 0; }
+
+        /* Push everything below the fixed masthead */
+        #page-content { margin-top: 58px; }
+
+        /* Active filter banner */
+        #filter-bar { display: none; padding: 12px 15px; background: #1a1a1a; border-bottom: 1px solid #333; font-size: 13px; color: #aaa; }
+        #filter-bar span { color: var(--accent); font-weight: bold; }
+        #tag-desc { color: #666; font-size: 0.85em; font-style: italic; margin-left: 12px; }
+        #filter-bar a { color: #888; cursor: pointer; margin-left: 15px; text-decoration: underline; }
+        #filter-bar a:hover { color: #fff; }
+
+        /* The Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; padding: 15px; transition: filter 0.5s ease, opacity 0.5s ease; }
+        .grid.dimmed { filter: grayscale(1); opacity: 1; pointer-events: none; }
+        
+        .thumb-container { background: #222; height: 120px; overflow: hidden; cursor: pointer; }
+        .thumb { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1); }
+        .thumb-container:hover .thumb { transform: scale(1.1); }
+
+        /* Lightbox & Fade-in Animation */
+        #lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; justify-content: center; align-items: center; background: var(--overlay); opacity: 0; transition: opacity 0.4s ease; }
+        #lightbox.visible { opacity: 1; }
+
+        .lb-content { position: relative; display: flex; flex-direction: column; align-items: center; }
+        .lb-close { position: fixed; top: 20px; left: 20px; color: #fff; font-size: 14px; cursor: pointer; letter-spacing: 2px; z-index: 110; background: rgba(0,0,0,0.6); padding: 10px 20px; border: 1px solid #444; }
+        
+        /* Natural size logic */
+        .image-stage { display: flex; justify-content: center; align-items: center; padding: 40px 40px 15px 40px; }
+        #lb-img { max-width: 90vw; max-height: 80vh; width: auto; height: auto; display: block; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+
+        .lb-meta { width: 100%; padding: 0; text-align: center; }
+        #lb-title { margin: 0; font-weight: 300; font-size: 1em; letter-spacing: 1px; }
+        .tag-link { color: var(--accent); cursor: pointer; margin: 0 5px; font-size: 0.85em; text-decoration: none; }
+        .tag-link:hover { text-decoration: underline; }
+
+
+    </style>
+</head>
+<body>
+
+<div id="menu-btn" onclick="toggleMenu()"><span></span><span></span><span></span></div>
+<div id="tag-menu"></div>
+<div id="masthead"><h1>Photographs by Oleg Boldyrev, travel, landscape, people</h1></div>
+<div id="page-content">
+<div id="filter-bar">Showing tag: <span id="active-tag"></span><span id="tag-desc"></span><a onclick="clearFilter()">Show all</a></div>
+<div class="grid" id="main-grid"></div>
+</div>
+
+<div id="lightbox" onclick="if(event.target==this) hidePhoto()">
+    <div class="lb-close" onclick="hidePhoto()">X [ESC]</div>
+    <div class="lb-content">
+        <div class="image-stage"><img id="lb-img" src="" alt=""></div>
+        <div class="lb-meta">
+            <h2 id="lb-title"></h2>
+            <div id="lb-tags"></div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // ── Edit this list to control which tags appear in the menu ──
+    // Each entry: { tag: 'tagname', desc: 'short description' }
+    // Leave desc as '' if you don't want a description for that tag
+    const menuTags = [
+        { tag: 'landscape',  desc: '' },
+{ tag: 'Baikal',  desc: '' },
+        { tag: 'Notes from forest floor', desc: '' },
+{ tag: 'bw', desc: '' },
+{ tag: 'Norway', desc: '' },
+ { tag: 'humour',  desc: '' },
+{ tag: 'Israel', desc: '' },
+{ tag: 'Iceland', desc: '' },
+{ tag: 'candid', desc: '' }
+
+       
+    ];
+    // ─────────────────────────────────────────────────────────────
+
+    let photoData = [];
+
+    async function loadGallery() {
+        try {
+            const res = await fetch('gallery.json');
+            photoData = await res.json();
+            drawGrid(shuffle(photoData));
+            buildTagMenu();
+        } catch (e) { console.error("Could not load gallery.json. Check your filenames!"); }
+    }
+
+    function buildTagMenu() {
+        const menu = document.getElementById('tag-menu');
+        menu.innerHTML = menuTags.map(t =>
+            `<span class="menu-tag" onclick="closeMenu(); filterByTag('${t.tag}', '${t.desc}')">${t.tag}</span>`
+        ).join('');
+    }
+
+    function toggleMenu() {
+        document.getElementById('menu-btn').classList.toggle('open');
+        document.getElementById('tag-menu').classList.toggle('open');
+    }
+
+    function closeMenu() {
+        document.getElementById('menu-btn').classList.remove('open');
+        document.getElementById('tag-menu').classList.remove('open');
+    }
+
+    function drawGrid(list) {
+        const grid = document.getElementById('main-grid');
+        grid.innerHTML = list.map(p => `
+            <div class="thumb-container" onclick="showPhoto('${p.file}')">
+                <img src="images/thumbs/${p.file}" class="thumb" loading="lazy">
+            </div>
+        `).join('');
+    }
+
+    function showPhoto(filename) {
+        const p = photoData.find(item => item.file === filename);
+        const lb = document.getElementById('lightbox');
+        const img = document.getElementById('lb-img');
+
+        const fullSrc = "images/full/" + filename.replace('.webp', '.jpg');
+        img.src = fullSrc;
+img.onerror = () => { img.onerror = null; img.src = "images/full/" + filename; };
+     
+
+        // Handle both capitalised and lowercase keys, Tags as string or array
+        const caption = p.Caption || p.caption || '';
+        const rawTags = p.Tags || p.tags || '';
+        const tags = Array.isArray(rawTags) ? rawTags : rawTags.split(',').map(t => t.trim()).filter(t => t);
+
+        document.getElementById('lb-title').innerText = caption;
+        document.getElementById('lb-tags').innerHTML = tags.map(t =>
+            `<span class="tag-link" onclick="event.stopPropagation(); hidePhoto(); filterByTag('${t}')">#${t}</span>`
+        ).join('');
+
+        lb.style.display = 'flex';
+        closeMenu();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                lb.classList.add('visible');
+                document.getElementById('main-grid').classList.add('dimmed');
+            });
+        });
+    }
+
+    function hidePhoto() {
+        const lb = document.getElementById('lightbox');
+        lb.classList.remove('visible');
+        document.getElementById('main-grid').classList.remove('dimmed');
+        setTimeout(() => { lb.style.display = 'none'; }, 400);
+    }
+
+    function filterByTag(tag, desc) {
+        const results = photoData.filter(p => {
+            const rawTags = p.Tags || p.tags || '';
+            const tags = Array.isArray(rawTags) ? rawTags : rawTags.split(',').map(t => t.trim());
+            return tags.includes(tag);
+        });
+        drawGrid(shuffle(results));
+        document.getElementById('active-tag').innerText = '#' + tag;
+        const entry = menuTags.find(t => t.tag === tag);
+        document.getElementById('tag-desc').innerText = (entry && entry.desc) ? entry.desc : (desc || '');
+        document.getElementById('filter-bar').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function clearFilter() {
+        drawGrid(shuffle(photoData));
+        document.getElementById('filter-bar').style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function shuffle(array) {
+        let m = array.length, t, i;
+        while (m) {
+            i = Math.floor(Math.random() * m--);
+            t = array[m]; array[m] = array[i]; array[i] = t;
+        }
+        return array;
+    }
+
+    // Keyboard support for closing
+    window.addEventListener('keydown', (e) => { if(e.key === "Escape") hidePhoto(); });
+
+    // Discourage casual image saving
+    document.addEventListener('contextmenu', e => { if(e.target.tagName === 'IMG') e.preventDefault(); });
+    document.addEventListener('dragstart', e => { if(e.target.tagName === 'IMG') e.preventDefault(); });
+
+    loadGallery();
+</script>
+</body>
+</html>
