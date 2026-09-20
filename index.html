@@ -16,10 +16,18 @@
         #menu-btn.open span:nth-child(2) { opacity: 0; }
         #menu-btn.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
+
+
+
         #tag-menu { position: fixed; top: 55px; left: 0; z-index: 50; background: #0d0d0d; border-right: 1px solid #222; border-bottom: 1px solid #222; padding: 10px 0; min-width: 180px; display: none; }
         #tag-menu.open { display: block; }
         .menu-tag { display: block; padding: 9px 24px; font-family: 'Raleway', sans-serif; font-weight: 300; font-size: 0.8em; letter-spacing: 2px; text-transform: uppercase; color: #888; cursor: pointer; transition: 0.2s; }
         .menu-tag:hover { color: #fff; background: #1a1a1a; }
+
+.menu-separator { border: none; border-top: 1px solid #222; margin: 8px 24px; }
+.menu-telegram { display: flex; align-items: center; gap: 8px; padding: 9px 24px; font-family: 'Raleway', sans-serif; font-weight: 300; font-size: 0.8em; letter-spacing: 2px; text-transform: uppercase; color: #888; text-decoration: none; transition: 0.2s; }
+.menu-telegram:hover { color: #fff; background: #1a1a1a; }
+.menu-telegram svg { flex-shrink: 0; }
 
         /* Masthead */
         #masthead { position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding: 18px 28px; text-align: right; background: var(--bg); border-bottom: 1px solid #222; }
@@ -52,7 +60,8 @@
         
         /* Natural size logic */
         .image-stage { display: flex; justify-content: center; align-items: center; padding: 40px 40px 15px 40px; background: #000; }
-        #lb-img { max-width: 90vw; max-height: 75vh; width: auto; height: auto; display: block; box-shadow: 0 0 40px rgba(0,0,0,0.8); image-rendering: auto; transform: translateZ(0); backface-visibility: hidden; background: #000; }
+        #lb-img { max-width: 90vw; max-height: 75vh; width: auto; height: auto; display: block; box-shadow: 0 0 40px rgba(0,0,0,0.8); image-rendering: auto; transform: translateZ(0); backface-visibility: hidden; background: #000;}
+
         .lb-meta { width: 100%; padding: 0; text-align: center; }
         #lb-title { margin: 0; font-weight: 300; font-size: 1em; letter-spacing: 1px; }
         .tag-link { color: var(--accent); cursor: pointer; margin: 0 5px; font-size: 0.85em; text-decoration: none; }
@@ -118,6 +127,12 @@
         menu.innerHTML = menuTags.map(t =>
             `<span class="menu-tag" onclick="closeMenu(); filterByTag('${t.tag}', '${t.desc}')">${t.tag}</span>`
         ).join('');
+menu.innerHTML += `
+    <hr class="menu-separator">
+    <a class="menu-telegram" href="https://t.me/nChHt" target="_blank" onclick="closeMenu()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.505c-.144.645-.535.8-1.084.498l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.08 14.4l-2.95-.924c-.64-.203-.654-.64.136-.948l11.527-4.445c.535-.19 1.003.131.769.165z"/></svg>
+        Telegram
+    </a>`;
     }
 
     function toggleMenu() {
@@ -130,13 +145,43 @@
         document.getElementById('tag-menu').classList.remove('open');
     }
 
+    // Strip the extension so we can try every real candidate rather than guessing one
+    function baseName(filename) {
+        return filename.replace(/\.(jpe?g|webp|png)$/i, '');
+    }
+
+    // Try a list of possible src candidates in order until one actually loads
+    function trySources(img, candidates) {
+        let i = 0;
+        function attemptNext() {
+            if (i >= candidates.length) return; // give up silently, nothing left to try
+            img.src = candidates[i++];
+        }
+        img.onerror = attemptNext;
+        attemptNext();
+    }
+
     function drawGrid(list) {
         const grid = document.getElementById('main-grid');
-        grid.innerHTML = list.map(p => `
+        grid.innerHTML = list.map(p => {
+            const base = baseName(p.file);
+            return `
             <div class="thumb-container" onclick="showPhoto('${p.file}')">
-                <img src="images/thumbs/${p.file}" class="thumb" loading="lazy">
+                <img data-base="${base}" class="thumb" loading="lazy">
             </div>
-        `).join('');
+        `;
+        }).join('');
+
+        // wire up fallback loading for each thumb after inserting into the DOM
+        grid.querySelectorAll('.thumb').forEach(img => {
+            const base = img.getAttribute('data-base');
+            trySources(img, [
+                `images/thumbs/${base}.webp`,
+                `images/thumbs/${base}.jpg`,
+                `images/thumbs/${base}.jpeg`,
+                `images/thumbs/${base}.png`
+            ]);
+        });
     }
 
     function showPhoto(filename) {
@@ -144,10 +189,13 @@
         const lb = document.getElementById('lightbox');
         const img = document.getElementById('lb-img');
 
-        const fullSrc = "images/full/" + filename.replace('.webp', '.jpg');
-        img.src = fullSrc;
-img.onerror = () => { img.onerror = null; img.src = "images/full/" + filename; };
-     
+        const base = baseName(filename);
+        trySources(img, [
+            `images/full/${base}.jpg`,
+            `images/full/${base}.jpeg`,
+            `images/full/${base}.webp`,
+            `images/full/${base}.png`
+        ]);
 
         // Handle both capitalised and lowercase keys, Tags as string or array
         const caption = p.Caption || p.caption || '';
